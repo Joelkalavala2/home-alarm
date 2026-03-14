@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../providers/app_provider.dart';
 import '../services/alarm_service.dart';
 
@@ -14,7 +15,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final AlarmService _alarmService = AlarmService();
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   int _currentTab = 0;
 
   @override
@@ -24,7 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _requestPermissionsAndStart();
   }
 
-  // ─── Request permissions then start tracking ───────────────
   Future<void> _requestPermissionsAndStart() async {
     final locationStatus = await Permission.location.request();
     if (locationStatus.isGranted) {
@@ -48,7 +48,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ─── Alarm popup dialog ────────────────────────────────────
   void _showAlarmDialog(double dist) {
     showDialog(
       context: context,
@@ -118,15 +117,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // TAB 1 — HOME
-  // ═══════════════════════════════════════════════════════════
+  // ═══ TAB 1 — HOME ═══
   Widget _buildHomeTab() {
     return Consumer<AppProvider>(
       builder: (context, provider, _) {
         return CustomScrollView(
           slivers: [
-            // Gradient App Bar
             SliverAppBar(
               expandedHeight: 160,
               pinned: true,
@@ -166,13 +162,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
             SliverPadding(
               padding: const EdgeInsets.all(16),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-
-                  // 📍 Current Location Card
                   _infoCard(
                     bgColor: const Color(0xFFECFDF5),
                     borderColor: const Color(0xFF10B981),
@@ -181,11 +174,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     value: provider.currentLat == null
                         ? 'Fetching GPS...'
                         : '${provider.currentLat!.toStringAsFixed(5)}, '
-                          '${provider.currentLng!.toStringAsFixed(5)}',
+                            '${provider.currentLng!.toStringAsFixed(5)}',
                   ),
                   const SizedBox(height: 12),
-
-                  // 🏠 Home Location Card
                   _infoCard(
                     bgColor: const Color(0xFFEFF6FF),
                     borderColor: const Color(0xFF3B82F6),
@@ -194,15 +185,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     value: provider.homeLat == null
                         ? 'Not set — tap button below'
                         : '${provider.homeLat!.toStringAsFixed(5)}, '
-                          '${provider.homeLng!.toStringAsFixed(5)}',
+                            '${provider.homeLng!.toStringAsFixed(5)}',
                   ),
                   const SizedBox(height: 12),
-
-                  // 📏 Distance Card
                   _distanceCard(provider),
                   const SizedBox(height: 20),
-
-                  // Set Home Button
                   _gradientButton(
                     label: '📌  SET CURRENT AS HOME',
                     onTap: () async {
@@ -220,8 +207,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-
-                  // Alarm Toggle
                   _alarmToggleCard(provider),
                   const SizedBox(height: 24),
                 ]),
@@ -233,54 +218,68 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // TAB 2 — MAP
-  // ═══════════════════════════════════════════════════════════
+  // ═══ TAB 2 — MAP (OpenStreetMap) ═══
   Widget _buildMapTab() {
     return Consumer<AppProvider>(
       builder: (context, provider, _) {
         final hasLocation = provider.currentLat != null;
+        final center = hasLocation
+            ? LatLng(provider.currentLat!, provider.currentLng!)
+            : const LatLng(17.3850, 78.4867);
 
         return Stack(
           children: [
-            hasLocation
-                ? GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(
-                          provider.currentLat!, provider.currentLng!),
-                      zoom: 13,
-                    ),
-                    onMapCreated: (c) => _mapController = c,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    markers: {
-                      if (provider.homeLat != null)
-                        Marker(
-                          markerId: const MarkerId('home'),
-                          position: LatLng(
-                              provider.homeLat!, provider.homeLng!),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                              BitmapDescriptor.hueViolet),
-                          infoWindow:
-                              const InfoWindow(title: '🏠 Home'),
-                        ),
-                    },
-                    circles: {
-                      if (provider.homeLat != null)
-                        Circle(
-                          circleId: const CircleId('radius'),
-                          center: LatLng(
-                              provider.homeLat!, provider.homeLng!),
-                          radius: provider.selectedRadius * 1000,
-                          fillColor: const Color(0xFF7C3AED).withOpacity(0.15),
-                          strokeColor: const Color(0xFF7C3AED),
-                          strokeWidth: 2,
-                        ),
-                    },
-                  )
-                : const Center(child: CircularProgressIndicator()),
-
-            // Map top label
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: center,
+                initialZoom: 13,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.myapp',
+                ),
+                if (provider.homeLat != null) ...[
+                  CircleLayer(
+                    circles: [
+                      CircleMarker(
+                        point: LatLng(provider.homeLat!, provider.homeLng!),
+                        radius: provider.selectedRadius * 1000,
+                        useRadiusInMeter: true,
+                        color: const Color(0xFF7C3AED).withOpacity(0.15),
+                        borderColor: const Color(0xFF7C3AED),
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: LatLng(provider.homeLat!, provider.homeLng!),
+                        width: 40,
+                        height: 40,
+                        child: const Icon(Icons.home,
+                            color: Color(0xFF7C3AED), size: 40),
+                      ),
+                    ],
+                  ),
+                ],
+                if (hasLocation)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: center,
+                        width: 40,
+                        height: 40,
+                        child: const Icon(Icons.location_pin,
+                            color: Colors.red, size: 40),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
             Positioned(
               top: 50,
               left: 16,
@@ -299,11 +298,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Text(
                   provider.homeLat == null
-                      ? '📍 Set your home location first'
+                      ? '📍 Go to Home tab and set your home location'
                       : '🟣 Purple circle = ${provider.selectedRadius.toInt()} km alarm zone',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 13),
                 ),
+              ),
+            ),
+            Positioned(
+              bottom: 20,
+              right: 16,
+              child: FloatingActionButton(
+                backgroundColor: const Color(0xFF7C3AED),
+                onPressed: () {
+                  if (hasLocation) {
+                    _mapController.move(center, 13);
+                  }
+                },
+                child: const Icon(Icons.my_location, color: Colors.white),
               ),
             ),
           ],
@@ -312,9 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // TAB 3 — SETTINGS
-  // ═══════════════════════════════════════════════════════════
+  // ═══ TAB 3 — SETTINGS ═══
   Widget _buildSettingsTab() {
     return Consumer<AppProvider>(
       builder: (context, provider, _) {
@@ -330,8 +340,6 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(16),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-
-                  // Radius Selector
                   _settingsCard(
                     title: '⚙️ Alarm Radius',
                     child: Column(
@@ -350,8 +358,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Alarm toggle
                   _settingsCard(
                     title: '🔔 Alarm',
                     child: SwitchListTile(
@@ -365,8 +371,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Tracking toggle
                   _settingsCard(
                     title: '📡 Tracking',
                     child: SwitchListTile(
@@ -385,16 +389,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // App info
                   Center(
                     child: Text(
                       'Home Alarm v1.0.0\nMade with Flutter ❤️',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: Colors.grey[500], fontSize: 12),
+                      style:
+                          TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
                   ),
                 ]),
@@ -406,10 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // SHARED WIDGETS
-  // ═══════════════════════════════════════════════════════════
-
+  // ═══ SHARED WIDGETS ═══
   Widget _infoCard({
     required Color bgColor,
     required Color borderColor,
@@ -440,8 +438,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: borderColor)),
             const SizedBox(height: 6),
             Text(value,
-                style:
-                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -454,8 +452,8 @@ class _HomeScreenState extends State<HomeScreen> {
       color: const Color(0xFFFFFBEB),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-            color: const Color(0xFFF59E0B).withOpacity(0.3)),
+        side:
+            BorderSide(color: const Color(0xFFF59E0B).withOpacity(0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -484,7 +482,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Padding(
                   padding: EdgeInsets.only(bottom: 8),
                   child: Text('km',
-                      style: TextStyle(fontSize: 18, color: Colors.grey)),
+                      style:
+                          TextStyle(fontSize: 18, color: Colors.grey)),
                 ),
               ],
             ),
@@ -554,10 +553,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _alarmToggleCard(AppProvider provider) {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SwitchListTile(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
         title: const Text('🔔 Alarm',
             style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(provider.alarmEnabled
@@ -580,8 +580,8 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 12),
             child: Text(title,
                 style: const TextStyle(
                     fontWeight: FontWeight.bold, fontSize: 14)),
