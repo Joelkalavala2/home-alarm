@@ -1,22 +1,48 @@
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
+plugins {
+    id("com.android.application")
+    id("dev.flutter.flutter-gradle-plugin")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.example.myapp"
+    compileSdk = 34
+    ndkVersion = "25.1.8937393"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    defaultConfig {
+        applicationId = "com.example.myapp"
+        minSdk = 21
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0.0"
+    }
+
+    buildTypes {
+    debug {
+        isMinifyEnabled = false
+        isShrinkResources = false
+    }
+    release {
+        isMinifyEnabled = false
+        isShrinkResources = false
+        signingConfig = signingConfigs.getByName("debug")
     }
 }
-
-val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
-rootProject.layout.buildDirectory.value(newBuildDir)
-
-subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-subprojects {
-    project.evaluationDependsOn(":app")
+flutter {
+    source = "../.."
 }
 
-tasks.register<Delete>("clean") {
-    delete(rootProject.layout.buildDirectory)
+dependencies {
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
 }
