@@ -17,19 +17,19 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.2'
           channel: 'stable'
-
-      - name: Disable Analytics
-        run: flutter config --no-analytics
+          cache: true
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Update pubspec SDK constraint
+        run: sed -i 's/sdk: \^3.9.0/sdk: ">=3.0.0 <4.0.0"/' pubspec.yaml
 
       - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons
