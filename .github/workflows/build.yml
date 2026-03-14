@@ -1,39 +1,32 @@
 name: Build APK
-
 on:
   push:
     branches: [ main ]
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: zulu
           java-version: '21'
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
       - name: Fix SDK constraint
-        run: sed -i 's/sdk: \^3.9.0/sdk: ">=3.0.0 <4.0.0"/' pubspec.yaml
-
+        run: |
+          sed -i 's/sdk: \^3\.9\.0/sdk: ">=3.0.0 <4.0.0"/' pubspec.yaml
+          cat pubspec.yaml | grep sdk
       - name: Get dependencies
         run: flutter pub get
-
       - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
