@@ -18,6 +18,10 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Force Kotlin 2.3.10
+        run: sed -i 's/id("org.jetbrains.kotlin.android") version "[^"]*"/id("org.jetbrains.kotlin.android") version "2.3.10"/' android/settings.gradle.kts
+      - name: Verify
+        run: grep kotlin android/settings.gradle.kts
       - run: flutter build apk --release --no-tree-shake-icons
       - uses: actions/upload-artifact@v4
         with:
